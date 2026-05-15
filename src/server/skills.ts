@@ -18,10 +18,6 @@ const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 // Helpers
 // ---------------------------------------------------------------------------
 
-function asString(value: unknown): string | null {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
 interface SkillFrontmatter {
   name?: string;
   description?: string;
