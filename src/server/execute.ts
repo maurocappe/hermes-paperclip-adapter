@@ -44,6 +44,8 @@ import {
   resolveProvider,
 } from "./detect-model.js";
 
+import { resolveProfileName } from "./profile-paths.js";
+
 // ---------------------------------------------------------------------------
 // Config helpers
 // ---------------------------------------------------------------------------
@@ -316,7 +318,12 @@ export async function execute(
 
   // ── Resolve configuration ──────────────────────────────────────────────
   const hermesCmd = cfgString(config.hermesCommand) || HERMES_CLI;
-  const model = cfgString(config.model) || DEFAULT_MODEL;
+  const explicitModel = cfgString(config.model);
+  const profile = resolveProfileName(config);
+  // WHY: when a profile is set, its config.yaml owns model/provider defaults.
+  // Don't shadow them with DEFAULT_MODEL — let the profile decide via the
+  // existing `if (model)` guard at the args-push site below.
+  const model = explicitModel ?? (profile ? undefined : DEFAULT_MODEL);
   const timeoutSec = cfgNumber(config.timeoutSec) || DEFAULT_TIMEOUT_SEC;
   const graceSec = cfgNumber(config.graceSec) || DEFAULT_GRACE_SEC;
   const maxTurns = cfgNumber(config.maxTurnsPerRun);
@@ -341,7 +348,7 @@ export async function execute(
 
   if (!explicitProvider) {
     try {
-      detectedConfig = await detectModel({ profile: cfgString(config.profile) });
+      detectedConfig = await detectModel({ profile: profile ?? undefined });
     } catch {
       // Non-fatal — detection failure shouldn't block execution
     }
@@ -360,7 +367,9 @@ export async function execute(
   // ── Build command args ─────────────────────────────────────────────────
   // Use -Q (quiet) to get clean output: just response + session_id line
   const useQuiet = cfgBoolean(config.quiet) !== false; // default true
-  const args: string[] = ["chat", "-q", prompt];
+  const args: string[] = [];
+  if (profile) args.push("-p", profile);
+  args.push("chat", "-q", prompt);
   if (useQuiet) args.push("-Q");
 
   if (model) {
@@ -404,6 +413,8 @@ export async function execute(
     args.push("--resume", prevSessionId);
   }
 
+  // WHY: extraArgs are appended last — a `-p other` here will override
+  // adapterConfig.profile (last-one-wins per Hermes CLI semantics).
   if (extraArgs?.length) {
     args.push(...extraArgs);
   }
@@ -437,7 +448,7 @@ export async function execute(
   // ── Log start ──────────────────────────────────────────────────────────
   await ctx.onLog(
     "stdout",
-    `[hermes] Starting Hermes Agent (model=${model}, provider=${resolvedProvider} [${resolvedFrom}], timeout=${timeoutSec}s${maxTurns ? `, max_turns=${maxTurns}` : ""})\n`,
+    `[hermes] Starting Hermes Agent (model=${model ?? `<profile:${profile}>`}, provider=${resolvedProvider} [${resolvedFrom}], timeout=${timeoutSec}s${maxTurns ? `, max_turns=${maxTurns}` : ""})\n`,
   );
   if (prevSessionId) {
     await ctx.onLog(
@@ -495,7 +506,9 @@ export async function execute(
     signal: result.signal,
     timedOut: result.timedOut,
     provider: resolvedProvider,
-    model,
+    // `model` is undefined when a profile is set and no override is given —
+    // Paperclip surfaces null as "profile-decided" in the UI.
+    model: model ?? null,
   };
 
   if (parsed.errorMessage) {
@@ -525,7 +538,10 @@ export async function execute(
 
   // Store session ID for next run
   if (persistSession && parsed.sessionId) {
-    executionResult.sessionParams = { sessionId: parsed.sessionId };
+    executionResult.sessionParams = {
+      sessionId: parsed.sessionId,
+      profile: profile ?? null,
+    };
     executionResult.sessionDisplayId = parsed.sessionId.slice(0, 16);
   }
 
