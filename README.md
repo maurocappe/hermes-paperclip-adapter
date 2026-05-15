@@ -210,7 +210,7 @@ Paperclip UI can display both managed and native skills in one view.
 ## Development
 
 ```bash
-git clone https://github.com/NousResearch/hermes-paperclip-adapter
+git clone https://github.com/maurocappe/hermes-paperclip-adapter
 cd hermes-paperclip-adapter
 npm install
 npm run build

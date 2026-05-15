@@ -7,7 +7,7 @@
   "author": "Nous Research",
   "repository": {
     "type": "git",
-    "url": "https://github.com/NousResearch/hermes-paperclip-adapter"
+    "url": "https://github.com/maurocappe/hermes-paperclip-adapter"
   },
   "keywords": [
     "paperclip",
