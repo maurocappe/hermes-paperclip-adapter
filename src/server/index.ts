@@ -4,7 +4,13 @@
 
 export { execute } from "./execute.js";
 export { testEnvironment } from "./test.js";
-export { detectModel, parseModelFromConfig, resolveProvider, inferProviderFromModel } from "./detect-model.js";
+export {
+  detectModel,
+  parseModelFromConfig,
+  resolveProvider,
+  inferProviderFromModel,
+  type DetectModelOptions,
+} from "./detect-model.js";
 export {
   listHermesSkills as listSkills,
   syncHermesSkills as syncSkills,

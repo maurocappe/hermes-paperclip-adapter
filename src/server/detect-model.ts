@@ -35,12 +35,32 @@ export interface DetectModelOptions {
 }
 
 /**
- * Read the Hermes config file and extract the default model config.
+ * Read a Hermes `config.yaml` and extract the default model config.
+ *
+ * @param options - { profile?, configPath? }
+ *   - `profile`: when set, reads `~/.hermes/profiles/<name>/config.yaml`.
+ *   - `configPath`: explicit path override (used by tests).
+ *
+ * Returns null if the file is missing or contains no `model.default`.
+ *
+ * @breaking In v0.4.0, this function changed from a positional
+ *   `configPath: string` parameter to an options object. Calls of the
+ *   form `detectModel("/path")` now throw at runtime with a migration hint.
  */
 export async function detectModel(
-  opts: DetectModelOptions = {},
+  options: DetectModelOptions = {},
 ): Promise<DetectedModel | null> {
-  const { profile, configPath } = opts;
+  // WHY: this function changed signature in v0.4.0 — previously took a
+  // positional `configPath: string`. JS consumers without TypeScript will
+  // silently pass `string` here and the destructure below would yield
+  // undefined for both fields. Catch that and fail with a clear migration
+  // hint instead of silently misbehaving.
+  if (typeof options === "string") {
+    throw new TypeError(
+      `detectModel signature changed: pass an options object instead of a positional string. Migrate: detectModel({ configPath: ${JSON.stringify(options)} })`,
+    );
+  }
+  const { profile, configPath } = options;
   const home = profile
     ? join(homedir(), ".hermes", "profiles", profile)
     : join(homedir(), ".hermes");
