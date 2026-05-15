@@ -10,7 +10,7 @@ import {
   resolvePaperclipDesiredSkillNames,
 } from "@paperclipai/adapter-utils/server-utils";
 import { fileURLToPath } from "node:url";
-import { resolveHermesHome } from "./profile-paths.js";
+import { resolveHermesHome, resolveProfileName } from "./profile-paths.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -118,10 +118,11 @@ async function buildSkillEntry(
 // ---------------------------------------------------------------------------
 
 async function buildHermesSkillSnapshot(config: Record<string, unknown>): Promise<AdapterSkillSnapshot> {
-  const profile =
-    typeof config.profile === "string" && config.profile.trim()
-      ? config.profile.trim()
-      : null;
+  // WHY: profile is derived here ONLY for the display labels passed to
+  // scanHermesSkills/buildSkillEntry. resolveHermesHome already calls
+  // resolveProfileName internally to compute the path — don't be tempted to
+  // pass `profile` into resolveHermesHome.
+  const profile = resolveProfileName(config);
   const hermesSkillsHome = path.join(resolveHermesHome(config), "skills");
 
   // 1. Scan Paperclip-managed skills (bundled with the adapter)
