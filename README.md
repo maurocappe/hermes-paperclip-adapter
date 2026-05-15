@@ -100,13 +100,54 @@ Create issues in Paperclip and assign them to your Hermes agent. On each heartbe
 3. Report results back to Paperclip
 4. Persist session state for continuity
 
+## Profiles
+
+Each Paperclip employee can be backed by a Hermes **profile** — a fully isolated Hermes identity with its own SOUL.md persona, memory, skills, sessions, and config. This lets you give an employee a stable persona that persists across runs.
+
+### Setup
+
+```bash
+hermes profile create code-reviewer
+hermes -p code-reviewer setup        # configure model + API keys interactively
+# Edit ~/.hermes/profiles/code-reviewer/SOUL.md to define the persona
+```
+
+### Use in `adapterConfig`
+
+```json
+{
+  "name": "Code Reviewer",
+  "adapterType": "hermes_local",
+  "adapterConfig": {
+    "profile": "code-reviewer",
+    "toolsets": "terminal,file,web"
+  }
+}
+```
+
+When `profile` is set:
+
+- The adapter passes `-p <name>` to every Hermes invocation.
+- `model` and `provider` default to the values in `~/.hermes/profiles/<name>/config.yaml`. Set them explicitly in `adapterConfig` only when overriding.
+- `env.HERMES_HOME` is dropped from the spawned child env so `-p` is the single source of truth.
+- Sessions are profile-scoped — switching `profile` on an existing agent skips the cross-profile resume and starts fresh.
+
+### Sharing a profile across employees
+
+Multiple Paperclip agents pointing at the same profile share **memory, skills, and SOUL.md persona**. Sessions remain separate (each run gets its own `session_id`). The skill list shows the profile name in `originLabel` so the scope is visible.
+
+### Validation
+
+`testEnvironment` returns `hermes_profile_not_found` (error) if the profile dir is missing, with the exact `hermes profile create <name>` remediation hint.
+
 ## Configuration Reference
 
 ### Core
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | string | `anthropic/claude-sonnet-4` | Model in `provider/model` format |
+| `profile` | string | *(none)* | Pre-existing Hermes profile name. See the Profiles section above. |
+| `model` | string | `anthropic/claude-sonnet-4` (or profile default) | Explicit model override. When `profile` is set, the profile's `config.yaml` decides if this is empty. |
 | `provider` | string | *(auto-detected)* | API provider: `auto`, `openrouter`, `nous`, `openai-codex`, `zai`, `kimi-coding`, `minimax`, `minimax-cn` |
 | `timeoutSec` | number | `300` | Execution timeout in seconds |
 | `graceSec` | number | `10` | Grace period before SIGKILL |
@@ -134,7 +175,7 @@ Available toolsets: `terminal`, `file`, `web`, `browser`, `code_execution`, `vis
 | `hermesCommand` | string | `hermes` | Custom CLI binary path |
 | `verbose` | boolean | `false` | Enable verbose output |
 | `quiet` | boolean | `true` | Quiet mode (clean output, no banner/spinner) |
-| `extraArgs` | string[] | `[]` | Additional CLI arguments |
+| `extraArgs` | string[] | `[]` | Additional CLI arguments. A `-p` flag here overrides the `profile` field (last-one-wins per Hermes). |
 | `env` | object | `{}` | Extra environment variables |
 | `promptTemplate` | string | *(built-in)* | Custom prompt template |
 | `paperclipApiUrl` | string | `http://127.0.0.1:3100/api` | Paperclip API base URL |

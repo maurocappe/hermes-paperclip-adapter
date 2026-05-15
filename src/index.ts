@@ -37,11 +37,25 @@ tools, persistent memory, session persistence, skills, and MCP support.
 - Hermes Agent installed: \`pip install hermes-agent\`
 - At least one LLM API key configured in ~/.hermes/.env
 
+## Profile (recommended)
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| profile | string | (none) | Name of a pre-existing Hermes profile. Each profile is a self-contained Hermes identity: SOUL.md persona, memory, skills, sessions. Pre-create with: \`hermes profile create <name>\` then \`hermes -p <name> setup\`. |
+
+When \`profile\` is set:
+- \`model\` and \`provider\` default to the values in
+  \`~/.hermes/profiles/<name>/config.yaml\`. Set them explicitly in
+  \`adapterConfig\` only when overriding.
+- The adapter passes \`-p <name>\` to every Hermes invocation.
+- Sessions are profile-scoped — switching \`profile\` on an existing agent
+  starts a fresh session.
+
 ## Core Configuration
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| model | string | (Hermes configured default) | Optional explicit model in provider/model format. Leave blank to use Hermes's configured default model. |
+| model | string | (Hermes configured default) | Optional explicit model override. When \`profile\` is set, the profile's \`config.yaml\` decides if this is empty. |
 | provider | string | (auto) | API provider: auto, openrouter, nous, openai-codex, zai, kimi-coding, minimax, minimax-cn. Usually not needed — Hermes auto-detects from model name. |
 | timeoutSec | number | 300 | Execution timeout in seconds |
 | graceSec | number | 10 | Grace period after SIGTERM before SIGKILL |
@@ -66,7 +80,7 @@ tools, persistent memory, session persistence, skills, and MCP support.
 |-------|------|---------|-------------|
 | hermesCommand | string | hermes | Path to hermes CLI binary |
 | verbose | boolean | false | Enable verbose output |
-| extraArgs | string[] | [] | Additional CLI arguments |
+| extraArgs | string[] | [] | Additional CLI arguments. Note: any \`-p\` flag here overrides the \`profile\` field (last-one-wins per Hermes). |
 | env | object | {} | Extra environment variables |
 | promptTemplate | string | (default) | Custom prompt template with {{variable}} placeholders |
 
