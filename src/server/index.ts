@@ -37,7 +37,8 @@ export const sessionCodec: AdapterSessionCodec = {
       readNonEmptyString(record.sessionId) ??
       readNonEmptyString(record.session_id);
     if (!sessionId) return null;
-    return { sessionId };
+    const profile = readNonEmptyString(record.profile);
+    return profile ? { sessionId, profile } : { sessionId };
   },
   serialize(params: Record<string, unknown> | null) {
     if (!params) return null;
@@ -45,7 +46,8 @@ export const sessionCodec: AdapterSessionCodec = {
       readNonEmptyString(params.sessionId) ??
       readNonEmptyString(params.session_id);
     if (!sessionId) return null;
-    return { sessionId };
+    const profile = readNonEmptyString(params.profile);
+    return profile ? { sessionId, profile } : { sessionId };
   },
   getDisplayId(params: Record<string, unknown> | null) {
     if (!params) return null;

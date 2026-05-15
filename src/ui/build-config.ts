@@ -81,6 +81,14 @@ export function buildHermesConfig(
     ac.promptTemplate = v.promptTemplate;
   }
 
+  // Hermes profile (JSON-only for v1; CreateConfigValues does not
+  // currently expose a UI form field, so users set this via the JSON
+  // config editor).
+  if ("profile" in v && typeof (v as { profile?: unknown }).profile === "string") {
+    const p = ((v as { profile?: string }).profile ?? "").trim();
+    if (p) ac.profile = p;
+  }
+
   // Heartbeat config is handled by Paperclip itself
 
   return ac;
