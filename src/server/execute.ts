@@ -405,12 +405,23 @@ export async function execute(
   // system is designed for human-attended interactive sessions.
   args.push("--yolo");
 
-  // Session resume
-  const prevSessionId = cfgString(
-    (ctx.runtime?.sessionParams as Record<string, unknown> | null)?.sessionId,
-  );
-  if (persistSession && prevSessionId) {
+  // Session resume — profile-aware
+  // WHY: a session ID lives inside one profile's sessions DB. If the user
+  // changed adapterConfig.profile since the last run, resuming a session ID
+  // from the OLD profile would either fail opaquely or silently start fresh
+  // while Paperclip thinks it resumed. Drop the resume in that case and log
+  // a notice so the operator sees what happened.
+  const sessionParams = (ctx.runtime?.sessionParams ?? {}) as Record<string, unknown>;
+  const prevSessionId = cfgString(sessionParams.sessionId);
+  const prevProfile = cfgString(sessionParams.profile) ?? null;
+  const profileMatches = (prevProfile ?? null) === (profile ?? null);
+  if (persistSession && prevSessionId && profileMatches) {
     args.push("--resume", prevSessionId);
+  } else if (persistSession && prevSessionId && !profileMatches) {
+    await ctx.onLog(
+      "stdout",
+      `[hermes] Skipping --resume: session was created under profile "${prevProfile ?? "<default>"}", current profile is "${profile ?? "<default>"}".\n`,
+    );
   }
 
   // WHY: extraArgs are appended last — a `-p other` here will override
@@ -434,6 +445,14 @@ export async function execute(
   const userEnv = config.env as Record<string, string> | undefined;
   if (userEnv && typeof userEnv === "object") {
     Object.assign(env, userEnv);
+  }
+
+  // WHY: if env.HERMES_HOME is set alongside profile, the spawned child
+  // sees a pre-set HERMES_HOME *and* receives -p, and Hermes's internal
+  // precedence between them is undocumented. Drop the env var when
+  // profile is active so -p is the single source of truth.
+  if (profile && env.HERMES_HOME) {
+    delete env.HERMES_HOME;
   }
 
   // ── Resolve working directory ──────────────────────────────────────────
