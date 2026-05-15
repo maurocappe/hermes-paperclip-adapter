@@ -13,9 +13,12 @@ import type {
 
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import fs from "node:fs/promises";
+import path from "node:path";
 
 import { HERMES_CLI, DEFAULT_MODEL, ADAPTER_TYPE, VALID_PROVIDERS } from "../shared/constants.js";
 import { detectModel, resolveProvider, inferProviderFromModel } from "./detect-model.js";
+import { resolveHermesHome, resolveProfileName } from "./profile-paths.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -236,6 +239,44 @@ async function checkProviderConsistency(
   return null;
 }
 
+async function checkProfile(
+  config: Record<string, unknown>,
+): Promise<AdapterEnvironmentCheck | null> {
+  const profile = resolveProfileName(config);
+  if (!profile) return null;
+
+  const profilePath = resolveHermesHome(config);
+  const stat = await fs.stat(profilePath).catch(() => null);
+  if (!stat || !stat.isDirectory()) {
+    // WHY: profile must pre-exist — Hermes won't auto-create it, and a
+    // missing profile would silently fall back to defaults, masking
+    // config drift. Surface the exact remediation command.
+    return {
+      level: "error",
+      message: `Hermes profile "${profile}" not found at ${profilePath}`,
+      hint: `Run: hermes profile create ${profile}`,
+      code: "hermes_profile_not_found",
+    };
+  }
+
+  const configYaml = path.join(profilePath, "config.yaml");
+  const cfgStat = await fs.stat(configYaml).catch(() => null);
+  if (!cfgStat) {
+    return {
+      level: "warn",
+      message: `Profile "${profile}" exists but has no config.yaml`,
+      hint: `Run: hermes -p ${profile} setup`,
+      code: "hermes_profile_invalid",
+    };
+  }
+
+  return {
+    level: "info",
+    message: `Hermes profile: ${profile}`,
+    code: "hermes_profile_configured",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Main test
 // ---------------------------------------------------------------------------
@@ -260,6 +301,12 @@ export async function testEnvironment(
       };
     }
   }
+
+  // 1b. Profile valid?
+  const profileCheck = await checkProfile(config);
+  if (profileCheck) checks.push(profileCheck);
+  // No early return — later checks (Python, API keys) still useful even
+  // if profile is broken.
 
   // 2. CLI version
   const versionCheck = await checkCliVersion(command);
