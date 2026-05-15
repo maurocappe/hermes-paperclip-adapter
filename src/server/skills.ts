@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import type {
   AdapterSkillContext,
@@ -11,6 +10,7 @@ import {
   resolvePaperclipDesiredSkillNames,
 } from "@paperclipai/adapter-utils/server-utils";
 import { fileURLToPath } from "node:url";
+import { resolveHermesHome } from "./profile-paths.js";
 
 const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,15 +20,6 @@ const __moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function resolveHermesHome(config: Record<string, unknown>): string {
-  const env =
-    typeof config.env === "object" && config.env !== null && !Array.isArray(config.env)
-      ? (config.env as Record<string, unknown>)
-      : {};
-  const configuredHome = asString(env.HOME);
-  return configuredHome ? path.resolve(configuredHome) : os.homedir();
 }
 
 interface SkillFrontmatter {
@@ -59,6 +50,7 @@ function parseSkillFrontmatter(content: string): SkillFrontmatter {
 
 async function scanHermesSkills(
   skillsHome: string,
+  profile: string | null,
 ): Promise<AdapterSkillEntry[]> {
   const entries: AdapterSkillEntry[] = [];
 
@@ -71,7 +63,7 @@ async function scanHermesSkills(
       // Check if the category directory itself has a SKILL.md (top-level skill)
       const topLevelSkillMd = path.join(catPath, "SKILL.md");
       if (await fs.stat(topLevelSkillMd).catch(() => null)) {
-        entries.push(await buildSkillEntry(cat.name, topLevelSkillMd, cat.name));
+        entries.push(await buildSkillEntry(cat.name, topLevelSkillMd, cat.name, profile));
       }
 
       // Scan for sub-skills
@@ -81,7 +73,7 @@ async function scanHermesSkills(
         const skillMd = path.join(catPath, item.name, "SKILL.md");
         if (await fs.stat(skillMd).catch(() => null)) {
           const key = item.name;
-          entries.push(await buildSkillEntry(key, skillMd, `${cat.name}/${item.name}`));
+          entries.push(await buildSkillEntry(key, skillMd, `${cat.name}/${item.name}`, profile));
         }
       }
     }
@@ -96,6 +88,7 @@ async function buildSkillEntry(
   key: string,
   skillMdPath: string,
   categoryPath: string,
+  profile: string | null,
 ): Promise<AdapterSkillEntry> {
   let description: string | null = null;
   try {
@@ -113,8 +106,10 @@ async function buildSkillEntry(
     managed: false,
     state: "installed",
     origin: "user_installed",
-    originLabel: "Hermes skill",
-    locationLabel: `~/.hermes/skills/${categoryPath}`,
+    originLabel: profile ? `Hermes skill (profile: ${profile})` : "Hermes skill",
+    locationLabel: profile
+      ? `~/.hermes/profiles/${profile}/skills/${categoryPath}`
+      : `~/.hermes/skills/${categoryPath}`,
     readOnly: true, // Hermes manages its own skills — Paperclip can't toggle them
     sourcePath: skillMdPath,
     targetPath: null,
@@ -127,8 +122,11 @@ async function buildSkillEntry(
 // ---------------------------------------------------------------------------
 
 async function buildHermesSkillSnapshot(config: Record<string, unknown>): Promise<AdapterSkillSnapshot> {
-  const home = resolveHermesHome(config);
-  const hermesSkillsHome = path.join(home, ".hermes", "skills");
+  const profile =
+    typeof config.profile === "string" && config.profile.trim()
+      ? config.profile.trim()
+      : null;
+  const hermesSkillsHome = path.join(resolveHermesHome(config), "skills");
 
   // 1. Scan Paperclip-managed skills (bundled with the adapter)
   const paperclipEntries = await readPaperclipRuntimeSkillEntries(config, __moduleDir);
@@ -137,7 +135,7 @@ async function buildHermesSkillSnapshot(config: Record<string, unknown>): Promis
   const availableByKey = new Map(paperclipEntries.map((e) => [e.key, e]));
 
   // 2. Scan Hermes's own skills from ~/.hermes/skills/
-  const hermesSkillEntries = await scanHermesSkills(hermesSkillsHome);
+  const hermesSkillEntries = await scanHermesSkills(hermesSkillsHome, profile);
   const hermesKeys = new Set(hermesSkillEntries.map((e) => e.key));
 
   // 3. Merge: Paperclip skills first (ephemeral), then Hermes skills
