@@ -191,7 +191,7 @@ async function checkProviderConsistency(
   // Try to detect from Hermes config
   let detectedConfig: Awaited<ReturnType<typeof detectModel>> | null = null;
   try {
-    detectedConfig = await detectModel();
+    detectedConfig = await detectModel({ profile: asString(config.profile) });
   } catch {
     // Non-fatal
   }

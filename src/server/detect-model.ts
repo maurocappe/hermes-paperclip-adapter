@@ -26,13 +26,25 @@ export interface DetectedModel {
   source: "config";
 }
 
+export interface DetectModelOptions {
+  /** Hermes profile name. When set, reads from
+   *  ~/.hermes/profiles/<name>/config.yaml instead of the default. */
+  profile?: string;
+  /** Override the resolved config path entirely (used by tests). */
+  configPath?: string;
+}
+
 /**
  * Read the Hermes config file and extract the default model config.
  */
 export async function detectModel(
-  configPath?: string,
+  opts: DetectModelOptions = {},
 ): Promise<DetectedModel | null> {
-  const filePath = configPath ?? join(homedir(), ".hermes", "config.yaml");
+  const { profile, configPath } = opts;
+  const home = profile
+    ? join(homedir(), ".hermes", "profiles", profile)
+    : join(homedir(), ".hermes");
+  const filePath = configPath ?? join(home, "config.yaml");
 
   let content: string;
   try {

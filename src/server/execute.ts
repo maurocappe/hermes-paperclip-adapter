@@ -341,7 +341,7 @@ export async function execute(
 
   if (!explicitProvider) {
     try {
-      detectedConfig = await detectModel();
+      detectedConfig = await detectModel({ profile: cfgString(config.profile) });
     } catch {
       // Non-fatal — detection failure shouldn't block execution
     }
